@@ -24,7 +24,8 @@ class Stocks(object):
         
         # financial data source
         self.STOCK_SOURCE = 'yahoo'
-        self.START_DATE= date(year, 1, 1).isoformat()
+        #self.START_DATE= date(year, 1, 1)
+        self.START_DATE=dt.strptime(f"{year}-01-01", '%Y-%m-%d').date()
         
         
         # list of companies
@@ -37,8 +38,8 @@ class Stocks(object):
         # set date as index and format to datetime     
         if 'Date' in df.columns:
             df.set_index('Date', inplace=True)
-            #df.index = pd.to_datetime(df.index, format = '%Y-%m-%d')
-            df.index = [dt.strptime(date, '%Y-%m-%d') for date in df.index]
+            df.index = pd.to_datetime(df.index, format = '%Y-%m-%d').date
+            # df.index = [dt.strptime(date, '%Y-%m-%d').date for date in df.index]
             return df
         
     def get_current_ticker(self):

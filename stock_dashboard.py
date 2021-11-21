@@ -89,9 +89,6 @@ date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.m
 df = stocks.get_trading_history(params["stock"], 
                                 stocks.START_DATE, 
                                 date_today)
-df.index = pd.to_datetime(df.index).date
-
-#df = get_stock_data(params["stock"], stocks.START_DATE)
 
 
 # -------------------- Date selection ------------------------------#
