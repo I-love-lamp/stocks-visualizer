@@ -12,7 +12,6 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 from matplotlib.dates import DateFormatter
-
 from moving_averages import compute_moving_averages
 from predictive_analysis import linear_reg
 from stocks import Stocks
@@ -90,6 +89,8 @@ todayDt = date.today()
 df = stocks.get_trading_history(params["stock"], 
                                 stocks.START_DATE, 
                                 todayDt)
+df.index = pd.to_datetime(df.index).date
+
 #df = get_stock_data(params["stock"], stocks.START_DATE)
 
 
