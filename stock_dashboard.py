@@ -85,10 +85,10 @@ selected_viz = st.sidebar.multiselect("Visualization", visualizations)
 
 
 # ------------------ Load dataset from filter parameters -----------#
-todayDt = date.today()
+date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
 df = stocks.get_trading_history(params["stock"], 
                                 stocks.START_DATE, 
-                                todayDt)
+                                date_today)
 df.index = pd.to_datetime(df.index).date
 
 #df = get_stock_data(params["stock"], stocks.START_DATE)
@@ -97,12 +97,12 @@ df.index = pd.to_datetime(df.index).date
 # -------------------- Date selection ------------------------------#
 # filter dates
 time_start = st.sidebar.date_input("Timeline start date", 
-                                   value=todayDt, 
-                                   max_value=todayDt)
+                                   value=date_year_back,
+                                   max_value=date_today)
 
 time_end = st.sidebar.date_input("Timeline end date", 
-                                   value=todayDt, 
-                                   max_value=todayDt)
+                                   value=date_today,
+                                   max_value=date_today)
 
 # --- Slidebar to choose length for computing Moving average
 window = st.sidebar.slider(label='Span to Compute Moving Average', 
@@ -179,8 +179,6 @@ if "Moving averages" in selected_viz:
     compute_moving_averages(df, 'Adj Close', window)
     plot_time_series_sns('Moving Averages', 'Moving Avg.', df.loc[:, 'SMA'], col3)
     # to do - plot the graphs for received df
-
-# retrieve the last 5 trading days
 
 
 # analyze = Analyzer(df, '2000-01-01', '2021-11-10')
