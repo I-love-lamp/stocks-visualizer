@@ -210,7 +210,6 @@ class Stocks(object):
         self.clean_data(trading_history)
         
         # filter data using startDt and endDt
-        startDt = dt.strptime(startDt, '%Y-%m-%d')
         #startDt = dt.strptime(endDt, '%Y-%m-%d %H:%M:%S')
         #trading_history = trading_history[(trading_history.index >= startDt) & (trading_history.index <= endDt)]
         return trading_history                 
