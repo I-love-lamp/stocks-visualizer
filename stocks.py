@@ -24,12 +24,12 @@ class Stocks(object):
         
         # financial data source
         self.STOCK_SOURCE = 'yahoo'
-        #self.START_DATE= date(year, 1, 1)
+        self.DIVIDEND_SOURCE = 'yahoo-dividends'
         self.START_DATE=dt.strptime(f"{year}-01-01", '%Y-%m-%d').date()
         
         
         # list of companies
-        self.TICKER_OVERVIEW = pd.DataFrame(pd.read_csv("nasdaq_screener_full.csv")).fillna("Unknown") # handle NaN values
+        self.TICKER_OVERVIEW = pd.DataFrame(pd.read_csv("nasdaq_screener.csv")).fillna("Unknown") # handle NaN values
         self.stocks_list = [] # populates UI with
         self.CURRENT_STOCK_DF = pd.DataFrame()
         self.CURRENT_TICKER = ''
@@ -56,7 +56,8 @@ class Stocks(object):
     
     def set_current_stock(self, ticker, startDt):       
         """
-        Function that sets the full trading data for the selected stock from .
+        Function that sets the full trading data for the selected stock from a 
+        selected date.
 
         Parameters
         ----------
@@ -177,8 +178,8 @@ class Stocks(object):
        """
        return self.stocks_list
         
-
-    def get_trading_history(self, ticker, startDt, endDt):
+   
+    def get_trading_history(self, ticker, startDt, endDt, save):
         """
         Function that retrieves trading data from saved files between two dates for a trading entity
 
@@ -190,27 +191,39 @@ class Stocks(object):
             Start date for historical trading data.
         toDt : Date
             End date for historical trading data.
-
+        save: Boolean
+            Flag for saving csv files.
         Returns
         -------
         trading_history : Data Frame
             Trading data for the selected period.
 
         """
+        
         # open the source file and return it as a DF
-        try:
-            trading_history = pd.read_csv(f"datasets/stocks/{ticker}.csv")
-            print("Retrieved ", len(trading_history), " rows for ", ticker, "between ", startDt, " and ", endDt)
-        except FileNotFoundError:
+        if save:
+            try:
+                trading_history = pd.read_csv(f"datasets/stocks/{ticker}.csv")
+                
+                # clean step
+                self.clean_data(trading_history)
+                
+                print("Retrieved ", len(trading_history), " rows for ", ticker, "between ", startDt, " and ", endDt)
+            except FileNotFoundError:
                 self.save_trading_data(ticker) # save the stock to CSV
                 # TODO: Error handling
-                trading_history = self.get_current_stock()    
-        
-        # clean step
-        self.clean_data(trading_history)
-        
+                trading_history = self.get_current_stock()
+                
+                # clean step
+                self.clean_data(trading_history)
+        else:
+            # get company data, dont save a CSV
+            trading_history = data.DataReader(ticker, self.STOCK_SOURCE, startDt)
+            
+                
         # filter data using startDt and endDt
         #startDt = dt.strptime(endDt, '%Y-%m-%d %H:%M:%S')
         #trading_history = trading_history[(trading_history.index >= startDt) & (trading_history.index <= endDt)]
         return trading_history                 
+        
         

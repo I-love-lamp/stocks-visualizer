@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os.path
+import os
 from datetime import date
 from datetime import datetime as dt
 from get_stock_data import get_stock_data
@@ -9,16 +9,21 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from pandas_datareader import data
 import seaborn as sns
 import streamlit as st
 from matplotlib.dates import DateFormatter
 from moving_averages import compute_moving_averages
 from predictive_analysis import linear_reg
 from stocks import Stocks
+from predictive_analysis import linear_reg, compute_rmse_and_r2_values, plot_linear_regression
+from model import Model
+from streamlit_toggle import st_toggleswitch
+import requests
+from requests.exceptions import ConnectionError
 
 # initialize stocks object to load data from the beginning of the chosen year to current date
-stocks = Stocks(1980)
-
+stocks = Stocks(2020)
 # retrieve and save stocks data (if trading data has not been saved)
 if not os.path.exists('datasets/stocks'):
     stocks.save_stock_files()
@@ -80,7 +85,7 @@ st.sidebar.button("Refresh data")
 st.write(f"""## *{params['stock']} : {params['name']}*""")
 
 # --- visualization selection --- #
-visualizations = ["Stock price", "Stock volume", "Moving averages"]
+visualizations = ["Stock price", "Stock volume", "Moving averages", "Weighted moving average", "Moving average converging/diverging"]
 selected_viz = st.sidebar.multiselect("Visualization", visualizations)
 
 
@@ -88,7 +93,8 @@ selected_viz = st.sidebar.multiselect("Visualization", visualizations)
 date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
 df = stocks.get_trading_history(params["stock"], 
                                 stocks.START_DATE, 
-                                date_today)
+                                date_today,
+                                save=True)
 
 
 # -------------------- Date selection ------------------------------#
@@ -114,17 +120,17 @@ def plot_time_series_sns(title, y_label, Y, col, df=df):
     end_date = df.index[len(df) - 1]
 
     # set aesthetics for the chart
-    sns.set(font_scale=6)
+    sns.set(font_scale=2)
     sns.set_style("whitegrid")
     sns.color_palette("bright")
     fig, ax = plt.subplots()
-    fig.set_figheight(32)
-    ax.set_xlabel("Date", fontsize = 100)
-    ax.set_ylabel(y_label, fontsize = 100)
-    ax.set_title(f"{title}", fontsize = 100)
+    fig.set_figheight(8)
+    ax.set_xlabel("Date", fontsize = 24)
+    ax.set_ylabel(y_label, fontsize = 24)
+    ax.set_title(f"{title}", fontsize = 24)
     sns.lineplot(x = mdates.date2num(df.index), y = Y, 
                     data = df, color = 'blue', err_style = 'band',
-                    linewidth = 10)
+                    linewidth = 3)
     plt.xticks(rotation = 90)
     
     
@@ -138,7 +144,7 @@ def plot_time_series_sns(title, y_label, Y, col, df=df):
         if "Moving averages" not in selected_viz:
             slope, intercept = np.polyfit(mdates.date2num(df.index), Y, 1)
             reg_line = slope*mdates.date2num(df.index) + intercept
-            plt.plot(df.index, reg_line, color='orange', linewidth=20, linestyle="dashed")
+            plt.plot(df.index, reg_line, color='orange', linewidth=6, linestyle="dashed")
             # plot selected timeframe
             col.pyplot(fig)
         else:
@@ -163,7 +169,65 @@ col7, col8 = st.columns(2)
 # Streamlit area plot
 if 'Stock price' in selected_viz:
     price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
+    
+    
+    # NodeJs server needed for toggleswitch - fallback to standard radio button
+    pred_slider = False # slider needs to be triggered
+    server_url = 'http://localhost:3001'
+    try:
+        server = requests.get('http://localhost:3001')
+        predict_yn_toggle = st_toggleswitch("Predict stock price?", True)
+        if predict_yn_toggle:
+            pred_slider = True
+    except ConnectionError:
+        predict_yn = col1.radio("Predict stock price?", options=['Yes', 'No'], index=0, 
+                          help="Select \"Yes\" to get options for stock prediction.")
+        if predict_yn == "Yes":
+            pred_slider = True
+        
+    if pred_slider:
+        # ------------------ Predictive model -----------------------------#
+        model = Model(stocks.START_DATE)
+        
+        # function runs once and caches the result
+        @st.cache(persist=True, show_spinner=True)
+        def build_model(company_list, model):
+            # build model if no columns
+            # TODO: multithread this solution, lazy loading
+            model_df = model.create_model(company_list)
+            model.save_model_file()
+            
+        
+        model_filepath = 'datasets/model/stock_data_model.csv'
+        # build the model if CSV file not present - otherwise use to CSV
+        if predict_yn == "Yes":
+            if not os.path.isfile(model_filepath):
+                # ----- build a model for all companies
+                build_model(companies.index, model)
+                #build_model(['GOOGL', 'DAL'], model)
+            else:
+                try:
+                    # read model from file
+                    model_df = pd.read_csv(model_filepath, index_col='Date')
+                    pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
+                    st.write(f'Model dimensions: {model_df.shape}')
+                    st.write(model_df.tail(5))
+                except FileNotFoundError:
+                    print("Unable to retrieve the model.")
+    
 
+    
+#price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
+
+# re-order columns - target --> col[n-1]
+# TODO: remove after testing
+#pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
+
+# TODO: train the model
+#model = linear_reg(df, pred_window, params['name'])
+
+# TODO: plot the model for a prediction window
+        
 # --- stock volume --- #
 if "Stock volume" in selected_viz:
     # area plot example
