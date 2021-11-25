@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-
+'''
+@author: daire
+'''
 import os
 from datetime import date
 from datetime import datetime as dt
@@ -166,7 +168,7 @@ col5, col6 = st.columns(2)
 col7, col8 = st.columns(2)
 
 # --- stock price --- #
-# Streamlit area plot
+# Streamlit line plot
 if 'Stock price' in selected_viz:
     price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
     
@@ -200,33 +202,26 @@ if 'Stock price' in selected_viz:
         
         model_filepath = 'datasets/model/stock_data_model.csv'
         # build the model if CSV file not present - otherwise use to CSV
-        if predict_yn == "Yes":
+        if pred_slider:
             if not os.path.isfile(model_filepath):
                 # ----- build a model for all companies
                 build_model(companies.index, model)
-                #build_model(['GOOGL', 'DAL'], model)
             else:
                 try:
                     # read model from file
                     model_df = pd.read_csv(model_filepath, index_col='Date')
                     pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
                     st.write(f'Model dimensions: {model_df.shape}')
-                    st.write(model_df.tail(5))
+                    
+                    #price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
+                    
+                    # TODO: train the model
+                    #model = linear_reg(model_df, pred_window, params['name'])
+                    
+                    # TODO: plot the model for a prediction window
                 except FileNotFoundError:
                     print("Unable to retrieve the model.")
     
-
-    
-#price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
-
-# re-order columns - target --> col[n-1]
-# TODO: remove after testing
-#pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
-
-# TODO: train the model
-#model = linear_reg(df, pred_window, params['name'])
-
-# TODO: plot the model for a prediction window
         
 # --- stock volume --- #
 if "Stock volume" in selected_viz:
@@ -239,9 +234,5 @@ if "Moving averages" in selected_viz:
     # add moving averages columns to the trading dataframe
     compute_moving_averages(df, 'Adj Close', window)
     plot_time_series_sns('Moving Averages', 'Moving Avg.', df.loc[:, 'SMA'], col3)
-    # to do - plot the graphs for received df
+    
 
-
-# analyze = Analyzer(df, '2000-01-01', '2021-11-10')
-# day_price = analyze.get_day_price(date_price)
-# col6.print(f"Stock price on {date_price} was {day_price}")

@@ -1,6 +1,11 @@
+'''
+@author: Laura, Vandana
+'''
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from pandas_datareader import data
 from math import sqrt
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
@@ -28,9 +33,16 @@ def compute_rmse_and_r2_values(y_train, y_history):
 
 # ------------------ prediction model with linear regression----------------------------------
 def linear_reg(df, input_days, company_name):
-    df.index = (df.index - pd.to_datetime("1970-01-01")).days
+    df['DateDays'] = (df.Date - pd.to_datetime("1970-01-01")).days
+    
+    # sample and split data into test and training sets
+    
+    # target variable is Closing price
     y_train = np.asarray(df["Close"])
-    x_train = np.asarray(df.index.values)
+    
+    # predictors: 'Date', 'High', 'Low', 'Open', 'Close', 'Volume', 'Adj Close', 'Company', 'Action'
+    x_train = df
+    
     regression_model = LinearRegression()
     regression_model.fit(x_train.reshape(-1, 1), y_train.reshape(-1, 1))
     y_history = regression_model.predict(x_train.reshape(-1, 1))
