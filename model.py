@@ -80,7 +80,7 @@ class Model(object):
         return dividend_hist
 
     # construct the model
-    def create_model(self, companies):
+    def create_model(self, company):
         '''
         Parameters
         ----------
@@ -94,34 +94,35 @@ class Model(object):
         '''
         row_count = 0
         print("Building the model...")
-        for company in companies:            
-            # API fails for tickers containing special characters
-            special_characters = "!@#$%^&*()-+?_=,<>/"
-            if not any(char in special_characters for char in company):
-                try:
-                    company_prices = data.DataReader(company, self.STOCK_SOURCE, self.START_DATE)
-                    company_prices = company_prices.reset_index()
-                    if row_count == 0:
-                        self.MODEL_DF = company_prices
-                    else:
-                        self.MODEL_DF = self.MODEL_DF.append(company_prices.loc[:, :'Adj Close'], ignore_index=True)
-                        
-                    if 'Company' not in self.MODEL_DF.columns:
-                        self.MODEL_DF['Company'] = ''
+         
+        # API fails for tickers containing special characters
+        special_characters = "!@#$%^&*()-+?_=,<>/"
+        if not any(char in special_characters for char in company):
+            try:
+                company_prices = data.DataReader(company, self.STOCK_SOURCE, self.START_DATE)
+                company_prices = company_prices.reset_index()
+                if row_count == 0:
+                    self.MODEL_DF = company_prices
+                else:
+                    self.MODEL_DF = self.MODEL_DF.append(company_prices.loc[:, :'Adj Close'], ignore_index=True)
                     
-                    self.MODEL_DF.iloc[row_count:1+(row_count+len(company_prices)), 7] = company
-                    self.MODEL_DF['Day Range'] = self.MODEL_DF['High'] - self.MODEL_DF['Low']
-                    row_count += len(company_prices)
-                    print(f"Added trading history for {company} to the model.")
-                except Exception as e:
-                    print('Unable to retrieve data for ', company, '. ', e)                
-            else:
-                print("Invalid Characters in company ticker string - unable to retrieve trading history.")
+                if 'Company' not in self.MODEL_DF.columns:
+                    self.MODEL_DF['Company'] = ''
+                
+                self.MODEL_DF.iloc[row_count:1+(row_count+len(company_prices)), 7] = company
+                self.MODEL_DF['Day Range'] = self.MODEL_DF['High'] - self.MODEL_DF['Low']
+                row_count += len(company_prices)
+                print(f"Added trading history for {company} to the model.")
+            except Exception as e:
+                print('Unable to retrieve data for ', company, '. ', e)                
+        else:
+            print("Invalid Characters in company ticker string - unable to retrieve trading history.")
         # re-order columns
-        cols = ['Date', 'Open', 'Close', 'Low', 'High', 'Day Range', 'Adj Close']
+        cols = ['Date', 'Open', 'Adj Close', 'Low', 'High', 'Day Range', 'Close']
         self.MODEL_DF = self.MODEL_DF[cols]
         self.MODEL_DF = self.MODEL_DF.reset_index(drop=True)
         self.MODEL_DF.set_index('Date', inplace=True)
+        
         # set flag to identify the model build status 
         self.set_model_state()
         
@@ -146,8 +147,8 @@ class Model(object):
         """
         try:
             path = self.MODEL_BASE_PATH + "/stock_data_model.csv"
-            #self.MODEL_DF = self.MODEL_DF.reset_index(drop=True, ignore_index=True)
             self.MODEL_DF.to_csv(path)
             print("Saved stock model data: ", path)
         except Exception as e :
            print(f"Could not save stock model data. {e}")
+           

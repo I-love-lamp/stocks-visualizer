@@ -18,14 +18,14 @@ from matplotlib.dates import DateFormatter
 from moving_averages import compute_moving_averages
 from predictive_analysis import linear_reg
 from stocks import Stocks
-from predictive_analysis import linear_reg, compute_rmse_and_r2_values, plot_linear_regression
+from predictive_analysis import linear_reg_v2, linear_reg, compute_rmse_and_r2_values, plot_linear_regression
 from model import Model
 from streamlit_toggle import st_toggleswitch
 import requests
 from requests.exceptions import ConnectionError
 
 # initialize stocks object to load data from the beginning of the chosen year to current date
-stocks = Stocks(2020)
+stocks = Stocks(1980)
 # retrieve and save stocks data (if trading data has not been saved)
 if not os.path.exists('datasets/stocks'):
     stocks.save_stock_files()
@@ -169,6 +169,8 @@ col7, col8 = st.columns(2)
 
 # --- stock price --- #
 # Streamlit line plot
+# TODO: remove after testing
+selected_viz = 'Stock price'
 if 'Stock price' in selected_viz:
     price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
     
@@ -193,10 +195,10 @@ if 'Stock price' in selected_viz:
         
         # function runs once and caches the result
         @st.cache(persist=True, show_spinner=True)
-        def build_model(company_list, model):
+        def build_model(stock, model):
             # build model if no columns
             # TODO: multithread this solution, lazy loading
-            model_df = model.create_model(company_list)
+            model_df = model.create_model(stock)
             model.save_model_file()
             
         
@@ -205,7 +207,7 @@ if 'Stock price' in selected_viz:
         if pred_slider:
             if not os.path.isfile(model_filepath):
                 # ----- build a model for all companies
-                build_model(companies.index, model)
+                build_model(params['stock'], model)
             else:
                 try:
                     # read model from file
@@ -213,10 +215,9 @@ if 'Stock price' in selected_viz:
                     pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
                     st.write(f'Model dimensions: {model_df.shape}')
                     
-                    #price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
-                    
-                    # TODO: train the model
-                    #model = linear_reg(model_df, pred_window, params['name'])
+                    # train the model
+                    #model = linear_reg_v2(model_df, pred_window, params['name'])
+                    model = linear_reg(model_df, pred_window, params['name'])
                     
                     # TODO: plot the model for a prediction window
                 except FileNotFoundError:
