@@ -16,16 +16,15 @@ import seaborn as sns
 import streamlit as st
 from matplotlib.dates import DateFormatter
 from moving_averages import compute_moving_averages
-from predictive_analysis import linear_reg
 from stocks import Stocks
-from predictive_analysis import linear_reg_v2, linear_reg, compute_rmse_and_r2_values, plot_linear_regression
+from predictive_analysis import linear_reg, compute_rmse_and_r2_values
 from model import Model
 from streamlit_toggle import st_toggleswitch
 import requests
 from requests.exceptions import ConnectionError
 
 # initialize stocks object to load data from the beginning of the chosen year to current date
-stocks = Stocks(1980)
+stocks = Stocks(2020)
 # retrieve and save stocks data (if trading data has not been saved)
 if not os.path.exists('datasets/stocks'):
     stocks.save_stock_files()
@@ -77,12 +76,6 @@ params = create_stock_item(stock_name)
 date_today = date.today()
 date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
 
-# --- Select Start Date For Stock Data ---- #
-time_start = st.sidebar.date_input("Select Start Date", value=date_year_back, max_value=date_today)
-
-# --- Refresh Button to refresh the dashboard --- #
-st.sidebar.button("Refresh data")
-
 # --- Print company details for selected stock --- #
 st.write(f"""## *{params['stock']} : {params['name']}*""")
 
@@ -108,10 +101,6 @@ time_start = st.sidebar.date_input("Timeline start date",
 time_end = st.sidebar.date_input("Timeline end date", 
                                    value=date_today,
                                    max_value=date_today)
-
-# --- Slidebar to choose length for computing Moving average
-window = st.sidebar.slider(label='Span to Compute Moving Average', 
-                           min_value=2, max_value=200, value=20, step=1)
 
 
 # ------------------ Plot data using filter parameters -------------#
@@ -169,8 +158,6 @@ col7, col8 = st.columns(2)
 
 # --- stock price --- #
 # Streamlit line plot
-# TODO: remove after testing
-selected_viz = 'Stock price'
 if 'Stock price' in selected_viz:
     price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
     
@@ -180,11 +167,11 @@ if 'Stock price' in selected_viz:
     server_url = 'http://localhost:3001'
     try:
         server = requests.get('http://localhost:3001')
-        predict_yn_toggle = st_toggleswitch("Predict stock price?", True)
+        predict_yn_toggle = st_toggleswitch("Predict stock price?", False)
         if predict_yn_toggle:
             pred_slider = True
     except ConnectionError:
-        predict_yn = col1.radio("Predict stock price?", options=['Yes', 'No'], index=0, 
+        predict_yn = col1.radio("Predict stock price?", options=['Yes', 'No'], index=1, 
                           help="Select \"Yes\" to get options for stock prediction.")
         if predict_yn == "Yes":
             pred_slider = True
@@ -200,7 +187,20 @@ if 'Stock price' in selected_viz:
             # TODO: multithread this solution, lazy loading
             model_df = model.create_model(stock)
             model.save_model_file()
-            
+       
+        
+       # -------------------plotting Stock Prediction Graph----------------#
+        def plot_linear_regression(x_train, x_test, y_history, y_predict, company_name, df, predict_parameter):
+            plt.figure(figsize=(12, 16))
+            plt.title("{0} {1} Price Predictions".format(company_name, predict_parameter))
+            plt.xlabel("Date")
+            plt.ylabel("Price USD ($)")
+            plt.plot(x_train, df["Close"], label="Historical Price", color="blue", linewidth=3)
+            plt.plot(x_train, y_history, label="Mathematical Model", color="orange", linewidth=3, linestyle='dashed')
+            plt.plot(x_test, y_predict, label="Stock Predictions", color="Red", linewidth=6)
+            plt.legend(loc="lower right")
+            return plt
+        
         
         model_filepath = 'datasets/model/stock_data_model.csv'
         # build the model if CSV file not present - otherwise use to CSV
@@ -215,11 +215,17 @@ if 'Stock price' in selected_viz:
                     pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
                     st.write(f'Model dimensions: {model_df.shape}')
                     
-                    # train the model
-                    #model = linear_reg_v2(model_df, pred_window, params['name'])
-                    model = linear_reg(model_df, pred_window, params['name'])
-                    
-                    # TODO: plot the model for a prediction window
+                    # train the model, make predictions, return metrics
+                    if pred_window > 1:
+                        x_train, x_test, y_history, y_predict, company_name, df, mse, r_squared = linear_reg(model_df, pred_window, params['name'])
+                        
+                        # plot the model for a prediction window
+                        plt = plot_linear_regression(x_train, x_test, y_history, y_predict, company_name, df, "Close")
+                        col1.pyplot(plt)
+                        
+                        # model metrics
+                        st.write("Model mean squared error: ", mse)
+                        st.write("Model R-squared value: ", r_squared)
                 except FileNotFoundError:
                     print("Unable to retrieve the model.")
     
@@ -231,8 +237,10 @@ if "Stock volume" in selected_viz:
 
 # --- Plot Moving Average --- #
 if "Moving averages" in selected_viz:
-    # TODO: address Nans
     # add moving averages columns to the trading dataframe
+    # --- Slidebar to choose length for computing Moving average
+    window = st.sidebar.slider(label='Span to Compute Moving Average', 
+                               min_value=2, max_value=200, value=20, step=1)
     compute_moving_averages(df, 'Adj Close', window)
     plot_time_series_sns('Moving Averages', 'Moving Avg.', df.loc[:, 'SMA'], col3)
     
