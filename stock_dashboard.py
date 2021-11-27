@@ -24,7 +24,7 @@ import requests
 from requests.exceptions import ConnectionError
 
 # initialize stocks object to load data from the beginning of the chosen year to current date
-stocks = Stocks(2020)
+stocks = Stocks(1980)
 # retrieve and save stocks data (if trading data has not been saved)
 if not os.path.exists('datasets/stocks'):
     stocks.save_stock_files()
@@ -83,15 +83,6 @@ st.write(f"""## *{params['stock']} : {params['name']}*""")
 visualizations = ["Stock price", "Stock volume", "Moving averages", "Weighted moving average", "Moving average converging/diverging"]
 selected_viz = st.sidebar.multiselect("Visualization", visualizations)
 
-
-# ------------------ Load dataset from filter parameters -----------#
-date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
-df = stocks.get_trading_history(params["stock"], 
-                                stocks.START_DATE, 
-                                date_today,
-                                save=True)
-
-
 # -------------------- Date selection ------------------------------#
 # filter dates
 time_start = st.sidebar.date_input("Timeline start date", 
@@ -101,6 +92,15 @@ time_start = st.sidebar.date_input("Timeline start date",
 time_end = st.sidebar.date_input("Timeline end date", 
                                    value=date_today,
                                    max_value=date_today)
+
+# ------------------ Load dataset from filter parameters -----------#
+date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
+df = stocks.get_trading_history(params["stock"], 
+                                time_start, 
+                                time_end,
+                                save=True)
+
+
 
 
 # ------------------ Plot data using filter parameters -------------#
@@ -147,7 +147,7 @@ def plot_time_series_sns(title, y_label, Y, col, df=df):
     return start_date, end_date
 
 
-st.subheader("Last 5-day Performance")
+st.subheader("Time period last 5-day Performance")
 st.write(df.tail(5))
 
 # ------------------ Create layout (2 X 4) -----------------------------#
@@ -181,10 +181,10 @@ if 'Stock price' in selected_viz:
         model = Model(stocks.START_DATE)
         
         # function runs once and caches the result
-        @st.cache(persist=True, show_spinner=True)
+        #@st.cache(persist=True, show_spinner=True)
         def build_model(stock, model):
             # build model if no columns
-            # TODO: multithread this solution, lazy loading
+            # TODO: need to update the model each time stock changes
             model_df = model.create_model(stock)
             model.save_model_file()
        

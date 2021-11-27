@@ -9,6 +9,7 @@ import pandas as pd
 import os
 from pandas_datareader import data
 from datetime import date
+import datetime
 from datetime import datetime as dt
 from datetime import timedelta
 
@@ -222,7 +223,11 @@ class Stocks(object):
             
                 
         # filter data using startDt and endDt
-        # trading_history = trading_history.loc[(trading_history.index >= startDt) & (trading_history.index <= endDt)]
+        startDt = dt.combine(startDt, datetime.time.min)
+        endDt = dt.combine(endDt, datetime.time.min)
+        trading_history.index = pd.to_datetime(trading_history.index, format='%Y-%m-%d', )
+        #trading_history.index = pd.to_datetime(trading_history.index)
+        trading_history = trading_history.loc[(trading_history.index >= startDt) & (trading_history.index <= endDt)]
         return trading_history                 
         
         
