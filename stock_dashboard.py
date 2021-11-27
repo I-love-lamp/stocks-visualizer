@@ -24,7 +24,12 @@ import requests
 from requests.exceptions import ConnectionError
 
 # initialize stocks object to load data from the beginning of the chosen year to current date
-stocks = Stocks(1980)
+stocks_start_year = 2000
+stocks = Stocks(stocks_start_year)
+
+# TODO: set start date dynamically based on how old we want the model to be
+model_start = '2016-01-01'
+model = Model(model_start)
 # retrieve and save stocks data (if trading data has not been saved)
 if not os.path.exists('datasets/stocks'):
     stocks.save_stock_files()
@@ -38,12 +43,29 @@ stock_list = sorted(set(companies.loc[:, "Name"]))
 
 st.write("""
          # Stock analyzer
-         Select a stock of interest to see its historical data. \
-             Use the Sector to identify stocks of interest.
+         Select a stock of interest to see its historical data.
          """)
+
+# -------------------- Stock selection ------------------------------#
 stock_name = st.sidebar.selectbox("Stock name",
                                   options=stock_list)
 
+visualizations = ["Stock price", "Stock volume", "Moving averages", "Weighted moving average", "Moving average converging/diverging"]
+selected_viz = st.sidebar.multiselect("Visualization", visualizations)
+
+
+# --- date selection --- #
+# --- Compute today's date and Year's back date to set as default --- #
+date_today = date.today()
+date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
+time_start = st.sidebar.date_input("Timeline start date", 
+                                   value=date_year_back,
+                                   min_value=stocks.START_DATE,
+                                   max_value=date_today)
+
+time_end = st.sidebar.date_input("Timeline end date", 
+                                   value=date_today,
+                                   max_value=date_today)
 # dictionary to hold stock data
 params = dict()
 
@@ -72,26 +94,10 @@ def create_stock_item(source):
 
 params = create_stock_item(stock_name)
 
-# --- Compute today's date and Year's back date to set as default --- #
-date_today = date.today()
-date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
 
 # --- Print company details for selected stock --- #
 st.write(f"""## *{params['stock']} : {params['name']}*""")
 
-# --- visualization selection --- #
-visualizations = ["Stock price", "Stock volume", "Moving averages", "Weighted moving average", "Moving average converging/diverging"]
-selected_viz = st.sidebar.multiselect("Visualization", visualizations)
-
-# -------------------- Date selection ------------------------------#
-# filter dates
-time_start = st.sidebar.date_input("Timeline start date", 
-                                   value=date_year_back,
-                                   max_value=date_today)
-
-time_end = st.sidebar.date_input("Timeline end date", 
-                                   value=date_today,
-                                   max_value=date_today)
 
 # ------------------ Load dataset from filter parameters -----------#
 date_year_back = date_today.replace(year=date_today.year - 1, month=date_today.month, day=date_today.day)
@@ -99,8 +105,6 @@ df = stocks.get_trading_history(params["stock"],
                                 time_start, 
                                 time_end,
                                 save=True)
-
-
 
 
 # ------------------ Plot data using filter parameters -------------#
@@ -156,14 +160,12 @@ col3, col4 = st.columns(2)
 col5, col6 = st.columns(2)
 col7, col8 = st.columns(2)
 
-# --- stock price --- #
-# Streamlit line plot
+# --- stock price visualization and price prediction --- #
 if 'Stock price' in selected_viz:
     price_start, price_end = plot_time_series_sns('stock price', 'USD ($)', df["Adj Close"], col1)
     
     
     # NodeJs server needed for toggleswitch - fallback to standard radio button
-    pred_slider = False # slider needs to be triggered
     server_url = 'http://localhost:3001'
     try:
         server = requests.get('http://localhost:3001')
@@ -175,18 +177,19 @@ if 'Stock price' in selected_viz:
                           help="Select \"Yes\" to get options for stock prediction.")
         if predict_yn == "Yes":
             pred_slider = True
+        else:
+            pred_slider = False
         
     if pred_slider:
         # ------------------ Predictive model -----------------------------#
-        model = Model(stocks.START_DATE)
-        
+        # TODO - trigger model rebuild when selected stock changes
         # function runs once and caches the result
-        #@st.cache(persist=True, show_spinner=True)
+        @st.cache(persist=True, show_spinner=True)
         def build_model(stock, model):
             # build model if no columns
             # TODO: need to update the model each time stock changes
             model_df = model.create_model(stock)
-            model.save_model_file()
+            return model_df, stock
        
         
        # -------------------plotting Stock Prediction Graph----------------#
@@ -199,37 +202,30 @@ if 'Stock price' in selected_viz:
             plt.plot(x_train, y_history, label="Mathematical Model", color="orange", linewidth=3, linestyle='dashed')
             plt.plot(x_test, y_predict, label="Stock Predictions", color="Red", linewidth=6)
             plt.legend(loc="lower right")
+            plt.xticks(rotation = 90)
             return plt
         
         
-        model_filepath = 'datasets/model/stock_data_model.csv'
-        # build the model if CSV file not present - otherwise use to CSV
         if pred_slider:
-            if not os.path.isfile(model_filepath):
-                # ----- build a model for all companies
-                build_model(params['stock'], model)
-            else:
-                try:
-                    # read model from file
-                    model_df = pd.read_csv(model_filepath, index_col='Date')
-                    pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
-                    st.write(f'Model dimensions: {model_df.shape}')
-                    
-                    # train the model, make predictions, return metrics
-                    if pred_window > 1:
-                        x_train, x_test, y_history, y_predict, company_name, df, mse, r_squared = linear_reg(model_df, pred_window, params['name'])
-                        
-                        # plot the model for a prediction window
-                        plt = plot_linear_regression(x_train, x_test, y_history, y_predict, company_name, df, "Close")
-                        col1.pyplot(plt)
-                        
-                        # model metrics
-                        st.write("Model mean squared error: ", mse)
-                        st.write("Model R-squared value: ", r_squared)
-                except FileNotFoundError:
-                    print("Unable to retrieve the model.")
-    
-        
+            # ----- build a model for selected company
+           stock_model, company = build_model(params['stock'], model)
+           pred_window = col1.slider("Prediction window (days)", min_value=1, max_value=365, step=30)
+           st.write(f'Model dimensions for {company}: {stock_model.shape}')
+            
+            # train the model, make predictions, return metrics
+           if pred_window > 1:
+                x_train, x_test, y_history, y_predict, company_name, df, mse, r_squared = linear_reg(stock_model, pred_window, params['name'])
+                
+                # model metrics
+                st.write("Model mean squared error: ", mse)
+                st.write("Model R-squared value: ", r_squared)
+                
+                # plot the model for a prediction window
+                plt = plot_linear_regression(x_train, x_test, y_history, y_predict, company_name, df, "Close")
+                col1.pyplot(plt)
+                st.balloons()
+                
+ 
 # --- stock volume --- #
 if "Stock volume" in selected_viz:
     # area plot example
