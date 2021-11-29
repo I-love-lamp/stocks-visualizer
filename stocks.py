@@ -30,7 +30,7 @@ class Stocks(object):
         
         
         # list of companies
-        self.TICKER_OVERVIEW = pd.DataFrame(pd.read_csv("nasdaq_screener.csv")).fillna("Unknown") # handle NaN values
+        self.TICKER_OVERVIEW = pd.DataFrame(pd.read_csv("nasdaq_screener_full.csv")).fillna("Unknown") # handle NaN values
         self.stocks_list = [] # populates UI with
         self.CURRENT_STOCK_DF = pd.DataFrame()
         self.CURRENT_TICKER = ''
