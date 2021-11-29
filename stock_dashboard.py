@@ -163,6 +163,8 @@ if 'Stock price' in selected_viz:
         predict_yn_toggle = st_toggleswitch("Predict stock price?", False)
         if predict_yn_toggle:
             pred_slider = True
+        else:
+            pred_slider = False
     except ConnectionError:
         predict_yn = col1.radio("Predict stock price?", options=['Yes', 'No'], index=1, 
                           help="Select \"Yes\" to get options for stock prediction.")
